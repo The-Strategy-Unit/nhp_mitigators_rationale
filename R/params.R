@@ -76,7 +76,7 @@ report_params_table <- function(
     purrr::map(unlist) |>
     purrr::map(tibble::enframe, "strategy", "time_profile") |>
     data.table::rbindlist(idcol = "activity_type") |>
-    dplyr::tibble()
+    tibble::tibble()
 
   parameter_data |>
     purrr::map_depth(2, "interval") |>
