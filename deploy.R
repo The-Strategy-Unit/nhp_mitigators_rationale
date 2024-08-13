@@ -10,7 +10,7 @@ files <- c(
     c(
       "mitigator_name_lookup.csv",
       "NHP_trust_code_lookup.xlsx",
-      "parameters.json"
+      "providers.json"
     )
   )
 )
