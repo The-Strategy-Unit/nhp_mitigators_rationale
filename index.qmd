@@ -1,0 +1,208 @@
+---
+title: "NHP mitigator selections and rationale"
+date: "last-modified"
+date-format: D MMM YYYY HH:mm
+format:
+  html:
+    grid:
+      body-width: 1400px
+execute:
+  echo: false
+  warning: false
+resource_files:
+- data/mitigator_name_lookup.csv
+- data/NHP_trust_code_lookup.xlsx
+- data/providers.json
+- R/azure.R
+- R/params.R
+- R/reasons.R
+---
+
+```{r}
+#| label: check-env-vars
+#| results: "asis"
+
+required_env_vars <- c(
+  "AZ_TENANT_ID",
+  "AZ_STORAGE_EP",
+  "AZ_STORAGE_CONTAINER",
+  "NHP_ENCRYPT_KEY"
+)
+if (any(Sys.getenv(required_env_vars) == "")) {
+  cat("One of the following environment variables was not set, so exiting \n\n")
+  cat(paste("*", required_env_vars, collapse = "\n"), "\n\n")
+  knitr::knit_exit() 
+}
+```
+
+```{r}
+#| label: attach-functions
+#| include: FALSE
+
+purrr::walk(file.path("R", c("azure.R", "params.R", "reasons.R")), source)
+```
+
+```{r}
+#| label: read-local-data
+
+mitigator_lookup <- readr::read_csv(
+  "data/mitigator_name_lookup.csv",
+  show_col_types = FALSE
+)
+
+scheme_lookup <- readxl::read_xlsx("data/NHP_trust_code_lookup.xlsx") |>
+  dplyr::mutate(
+    scheme_code = `Trust ODS Code`,
+    scheme_name = paste0(`Name of Hospital site`, " (", scheme_code, ")"),
+    .keep = "none"
+  ) 
+```
+
+```{r}
+#| label: get-final-runs
+
+container <- get_container()
+result_sets <- get_nhp_result_sets(container)
+
+final_runs <- result_sets |>
+  dplyr::filter(run_stage == "final_report_ndg2") |>  # focus on final reports
+  dplyr::select(dataset, scenario, run_stage, file)
+
+final_runs_data <- final_runs$file |>
+  purrr::map(\(x) get_nhp_results(container, x)) |>
+  purrr::set_names(final_runs$dataset)
+```
+
+```{r}
+#| label: extract-values
+
+all_params <- final_runs_data |> purrr::map(\(x) x |> purrr::pluck("params"))
+all_reasons <- all_params |> purrr::map(\(x) x |> purrr::pluck("reasons"))
+
+mitigator_reasons_df <- purrr::map(
+  c("activity_avoidance", "efficiencies"),  # separate list elements, need both
+  \(x) extract_reasons(all_reasons, x, mitigator_lookup, scheme_lookup)
+) |>
+  purrr::list_rbind()
+
+mitigator_values_df <- extract_params(
+  all_params,
+  final_runs,
+  mitigator_lookup,
+  scheme_lookup
+)
+```
+
+```{r}
+#| label: prepare-tables
+
+# Final output tables
+
+mitigators_by_scheme <- dplyr::left_join(
+  mitigator_values_df,
+  mitigator_reasons_df,
+  by = dplyr::join_by(
+    `Mitigator code`,
+    `Mitigator name`,
+    `Mitigator type`,
+    `Activity type`,
+    Scheme
+  )
+) |>
+  dplyr::rename(
+    "Low (scheme)" = Low,
+    "High (scheme)" = High,
+    "Midpoint (scheme)" = Midpoint,
+    "Range (scheme)" = Range
+  )
+
+mitigator_values_summarised <- mitigator_values_df |>
+  dplyr::summarise(
+    dplyr::across(
+      c(Low, High, Midpoint, Range),
+      mean
+    ),
+    .by = c(
+      `Mitigator code`,
+      `Mitigator name`,
+      `Mitigator type`,
+      `Activity type`
+    )
+  ) |>
+  dplyr::rename(
+    "Low (mean)" = Low,
+    "High (mean)" = High,
+    "Midpoint (mean)" = Midpoint,
+    "Range (mean)" = Range
+  )
+```
+
+```{r}
+#| label: combine-tables
+
+mitigators_table <- mitigators_by_scheme |>
+  dplyr::left_join(
+    mitigator_values_summarised,
+    by = dplyr::join_by(
+      `Mitigator code`,
+      `Mitigator name`,
+      `Mitigator type`,
+      `Activity type`
+    )
+  ) |>
+  dplyr::mutate(
+    `Mitigator name` = paste0(`Mitigator code`, ": ", `Mitigator name`),
+    `Years in horizon` = `Horizon year` - `Baseline year`,
+    dplyr::across(dplyr::where(is.double), \(x) janitor::round_half_up(x, 3)),
+    dplyr::across(
+      c(`Activity type`, `Mitigator type`, Scheme),
+      factor  # allows for discrete filtering in DT::datatable()
+    )
+  ) |>
+  dplyr::select(
+    `Activity type`,
+    `Mitigator type`,
+    `Mitigator name`,
+    Scheme,
+    `Years in horizon`,
+    tidyselect::starts_with("Midpoint"),
+    tidyselect::starts_with("Range"),
+    tidyselect::starts_with("Low"),
+    tidyselect::starts_with("High"),
+    Reason
+  )
+```
+
+This table shows the mitigators selected by each of the schemes that have run a 'final' scenario, along with their rationale for selecting the values they chose. The value for the mitigator is summarised here as the midpoint (i.e. the difference between the low and high values). For context, the mean midpoint across all schemes with a final scenario is also shown.
+
+The downloadable CSV also contains columns for the low, high and range values selected by the scheme and the mean of these values across all schemes that have run a final scenario.
+
+Please [message the Data Science team inbox](mailto:mlcsu.su.datascience@nhs.net) with questions or requests.
+
+```{r}
+#| label: interactive-table
+
+mitigators_table |>
+  DT::datatable(
+    extensions = 'Buttons',
+    options = list(
+      dom = 'Bftp',
+      pageLength = 5,
+      buttons = list( 
+        list(
+          extend = "csv",   
+          filename = paste0(Sys.Date(), "_final-mitigator-reasons-and-selections"),
+          text = "Download CSV"
+        )
+      ),
+      columnDefs = list(
+        list(
+          visible = FALSE, 
+          targets = 7:12
+        )
+      )
+    ),
+    filter = "top",
+    rownames = FALSE
+  )
+```
