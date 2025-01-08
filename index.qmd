@@ -13,6 +13,7 @@ resource_files:
 - R/azure.R
 - R/params.R
 - R/reasons.R
+- R/utils.R
 ---
 
 ```{r}
@@ -20,12 +21,15 @@ resource_files:
 #| results: "asis"
 
 required_env_vars <- c(
-  "AZ_TENANT_ID",
+  "AZ_APP_ID",
+  "AZ_APP_SECRET",
   "AZ_STORAGE_EP",
   "AZ_STORAGE_CONTAINER_RESULTS",
   "AZ_STORAGE_CONTAINER_SUPPORT",
+  "AZ_TENANT_ID",
   "NHP_ENCRYPT_KEY"
 )
+
 if (any(Sys.getenv(required_env_vars) == "")) {
   cat("One of the following environment variables was not set, so exiting \n\n")
   cat(paste("*", required_env_vars, collapse = "\n"), "\n\n")
@@ -37,7 +41,10 @@ if (any(Sys.getenv(required_env_vars) == "")) {
 #| label: attach-functions
 #| include: FALSE
 
-purrr::walk(file.path("R", c("azure.R", "params.R", "reasons.R")), source)
+purrr::walk(
+  file.path("R", c("azure.R", "params.R", "reasons.R", "utils.R")),
+  source
+)
 ```
 
 ```{r}
@@ -48,14 +55,12 @@ container_support <-
 
 mitigator_lookup <- AzureStor::storage_read_csv(
   container_support,
-  "mitigator-lookup.csv",
-  show_col_types = FALSE
+  "mitigator-lookup.csv"
 )
 
 scheme_lookup <- AzureStor::storage_read_csv(
   container_support,
-  "nhp-scheme-lookup.csv",
-  show_col_types = FALSE
+  "nhp-scheme-lookup.csv"
 ) |> 
   dplyr::mutate(
     scheme_code = `Trust ODS Code`,
