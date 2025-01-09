@@ -10,12 +10,10 @@ execute:
   echo: false
   warning: false
 resource_files:
-- data/mitigator_name_lookup.csv
-- data/NHP_trust_code_lookup.xlsx
-- data/providers.json
 - R/azure.R
 - R/params.R
 - R/reasons.R
+- R/utils.R
 ---
 
 ```{r}
@@ -23,11 +21,15 @@ resource_files:
 #| results: "asis"
 
 required_env_vars <- c(
-  "AZ_TENANT_ID",
+  "AZ_APP_ID",
+  "AZ_APP_SECRET",
   "AZ_STORAGE_EP",
-  "AZ_STORAGE_CONTAINER",
+  "AZ_STORAGE_CONTAINER_RESULTS",
+  "AZ_STORAGE_CONTAINER_SUPPORT",
+  "AZ_TENANT_ID",
   "NHP_ENCRYPT_KEY"
 )
+
 if (any(Sys.getenv(required_env_vars) == "")) {
   cat("One of the following environment variables was not set, so exiting \n\n")
   cat(paste("*", required_env_vars, collapse = "\n"), "\n\n")
@@ -39,45 +41,54 @@ if (any(Sys.getenv(required_env_vars) == "")) {
 #| label: attach-functions
 #| include: FALSE
 
-purrr::walk(file.path("R", c("azure.R", "params.R", "reasons.R")), source)
+purrr::walk(
+  file.path("R", c("azure.R", "params.R", "reasons.R", "utils.R")),
+  source
+)
 ```
 
 ```{r}
-#| label: read-local-data
+#| label: read-support-data
 
-mitigator_lookup <- readr::read_csv(
-  "data/mitigator_name_lookup.csv",
-  show_col_types = FALSE
+container_support <- 
+  get_container(container_name = Sys.getenv("AZ_STORAGE_CONTAINER_SUPPORT"))
+
+mitigator_lookup <- AzureStor::storage_read_csv(
+  container_support,
+  "mitigator-lookup.csv"
 )
 
-scheme_lookup <- readxl::read_xlsx("data/NHP_trust_code_lookup.xlsx") |>
+scheme_lookup <- AzureStor::storage_read_csv(
+  container_support,
+  "nhp-scheme-lookup.csv"
+) |> 
   dplyr::mutate(
     scheme_code = `Trust ODS Code`,
     scheme_name = paste0(`Name of Hospital site`, " (", scheme_code, ")"),
     .keep = "none"
-  ) 
+  )
 ```
 
 ```{r}
 #| label: get-final-runs
 
-container <- get_container()
-result_sets <- get_nhp_result_sets(container)
+container_results <- get_container()
+result_sets <- get_nhp_result_sets(container_results)
 
 final_runs <- result_sets |>
   dplyr::filter(run_stage == "final_report_ndg2") |>  # focus on final reports
   dplyr::select(dataset, scenario, run_stage, file)
 
-final_runs_data <- final_runs$file |>
-  purrr::map(\(x) get_nhp_results(container, x)) |>
-  purrr::set_names(final_runs$dataset)
+final_runs_data <- final_runs[["file"]] |>
+  purrr::map(\(x) get_nhp_results(container_results, x)) |>
+  purrr::set_names(final_runs[["dataset"]])
 ```
 
 ```{r}
 #| label: extract-values
 
-all_params <- final_runs_data |> purrr::map(\(x) x |> purrr::pluck("params"))
-all_reasons <- all_params |> purrr::map(\(x) x |> purrr::pluck("reasons"))
+all_params <- final_runs_data |> purrr::map(\(x) purrr::pluck(x, "params"))
+all_reasons <- all_params |> purrr::map(\(x) purrr::pluck(x, "reasons"))
 
 mitigator_reasons_df <- purrr::map(
   c("activity_avoidance", "efficiencies"),  # separate list elements, need both
@@ -155,7 +166,7 @@ mitigators_table <- mitigators_by_scheme |>
     `Years in horizon` = `Horizon year` - `Baseline year`,
     dplyr::across(dplyr::where(is.double), \(x) janitor::round_half_up(x, 3)),
     dplyr::across(
-      c(`Activity type`, `Mitigator type`, Scheme),
+      c(`Activity type`, `Mitigator type`, `Mitigator name`, Scheme),
       factor  # allows for discrete filtering in DT::datatable()
     )
   ) |>
@@ -191,7 +202,7 @@ mitigators_table |>
       buttons = list( 
         list(
           extend = "csv",   
-          filename = paste0(Sys.Date(), "_final-mitigator-reasons-and-selections"),
+          filename = paste0(Sys.Date(), "_mitigator-reasons-and-selections"),
           text = "Download CSV"
         )
       ),

@@ -25,16 +25,9 @@ extract_params <- function(
         peer,
         "_", stringr::str_sub(baseline_year, 3, 4),
         "_", stringr::str_sub(horizon_year, 3, 4)
-      ),
-      strategy= dplyr::case_match(
-        strategy,
-        "bads_daycase" ~ "day_procedures_usually_dc",
-        "bads_daycase_occasional" ~ "day_procedures_occasionally_dc",
-        "bads_outpatients" ~ "day_procedures_usually_op",
-        "bads_outpatients_or_daycase" ~ "day_procedures_occasionally_op",
-        .default = strategy
       )
     ) |>
+    correct_day_procedures() |>
     dplyr::left_join(runs_meta, by = dplyr::join_by("peer" == "dataset")) |>
     dplyr::left_join(
       mitigator_lookup,
@@ -65,6 +58,7 @@ extract_params <- function(
 
 }
 
+# Generate table of results
 report_params_table <- function(
     p,  # a single scheme's params
     parameter = c("activity_avoidance", "efficiencies")
@@ -75,8 +69,8 @@ report_params_table <- function(
   time_profiles <- p[["time_profile_mappings"]][[parameter]] |>
     purrr::map(unlist) |>
     purrr::map(tibble::enframe, "strategy", "time_profile") |>
-    data.table::rbindlist(idcol = "activity_type") |>
-    tibble::tibble()
+    purrr::list_rbind(names_to = "activity_type") |>
+    dplyr::tibble()
 
   parameter_data |>
     purrr::map_depth(2, "interval") |>
