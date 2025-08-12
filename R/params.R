@@ -28,7 +28,6 @@ extract_params <- function(
         "_", stringr::str_sub(horizon_year, 3, 4)
       )
     ) |>
-    correct_day_procedures() |>
     dplyr::left_join(runs_meta, by = dplyr::join_by("peer" == "dataset")) |>
     dplyr::left_join(
       mitigator_lookup,

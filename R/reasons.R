@@ -23,8 +23,7 @@ extract_reasons <- function(
           reason = value
         )
     }) |>
-    dplyr::bind_rows(.id = "peer") |>
-    correct_day_procedures()
+    dplyr::bind_rows(.id = "peer")
 
   # Add scheme/mitigatoer groupings, prettify labels
   reasons_extracted |>
