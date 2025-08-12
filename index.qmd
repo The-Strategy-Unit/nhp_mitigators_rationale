@@ -79,6 +79,9 @@ final_runs <- result_sets |>
   dplyr::filter(run_stage == "final_report_ndg2") |>  # focus on final reports
   dplyr::select(dataset, scenario, run_stage, file)
 
+# TODO: remove after testing
+final_runs <- final_runs[1:2, ]
+
 final_runs_data <- final_runs[["file"]] |>
   purrr::map(\(x) get_nhp_results(container_results, x)) |>
   purrr::set_names(final_runs[["dataset"]])

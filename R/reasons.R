@@ -19,7 +19,6 @@ extract_reasons <- function(
         tibble::enframe() |>
         tidyr::unnest_longer(value) |>
         dplyr::select(
-          activity_type = name,
           strategy = value_id,
           reason = value
         )
@@ -31,17 +30,17 @@ extract_reasons <- function(
   reasons_extracted |>
     dplyr::left_join(
       mitigator_lookup,
-      by = dplyr::join_by(strategy == "Strategy variable")
+      by = dplyr::join_by(strategy == mitigator_variable)
     ) |>
     dplyr::left_join(
       scheme_lookup,
       by = dplyr::join_by(peer == scheme_code)
     ) |>
     dplyr::select(
-      `Mitigator code`,
-      `Mitigator name` = `Strategy name`,
-      `Mitigator type`,
-      `Activity type`,
+      `Mitigator code` = mitigator_code,
+      `Mitigator name` = mitigator_name,
+      `Mitigator type` = mitigator_type,
+      `Activity type` = activity_type,
       `Scheme` = scheme_name,
       Reason = reason
     ) |>
