@@ -2,6 +2,7 @@
 title: "NHP mitigator selections and rationale"
 date: "last-modified"
 date-format: D MMM YYYY HH:mm
+author: "[Data Science, The Strategy Unit](mailto:mlcsu.su.datascience@nhs.net)"
 format:
   html:
     grid:
@@ -56,7 +57,8 @@ container_support <-
 mitigator_lookup <- AzureStor::storage_read_csv(
   container_support,
   "mitigator-lookup.csv"
-)
+) |> 
+  dplyr::filter(is.na(active_to))  # non-NA active_to means it's deprecated
 
 scheme_lookup <- AzureStor::storage_read_csv(
   container_support,
@@ -101,7 +103,8 @@ mitigator_values_df <- extract_params(
   final_runs,
   mitigator_lookup,
   scheme_lookup
-)
+) |> 
+  dplyr::filter(!is.na(`Mitigator code`))  # discard mitigators not in lookup
 ```
 
 ```{r}

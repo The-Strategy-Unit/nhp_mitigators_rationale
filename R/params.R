@@ -20,6 +20,7 @@ extract_params <- function(
 
   activity_avoidance |>
     dplyr::bind_rows(efficiencies) |>
+    dplyr::select(-activity_type) |>
     dplyr::mutate(
       peer_year = paste0(
         peer,
@@ -27,11 +28,10 @@ extract_params <- function(
         "_", stringr::str_sub(horizon_year, 3, 4)
       )
     ) |>
-    correct_day_procedures() |>
     dplyr::left_join(runs_meta, by = dplyr::join_by("peer" == "dataset")) |>
     dplyr::left_join(
       mitigator_lookup,
-      by = dplyr::join_by(strategy == "Strategy variable")
+      by = dplyr::join_by(strategy == mitigator_variable)
     ) |>
     dplyr::left_join(
       scheme_lookup,
@@ -42,10 +42,10 @@ extract_params <- function(
       Range = value_2 - value_1
     ) |>
     dplyr::select(
-      `Mitigator code`,
-      `Mitigator name` = `Strategy name`,
-      `Mitigator type`,
-      `Activity type`,
+      `Mitigator code` = mitigator_code,
+      `Mitigator name` = mitigator_name,
+      `Mitigator type` = mitigator_type,
+      `Activity type` = activity_type,
       `Scheme` = scheme_name,
       `Baseline year` = baseline_year,
       `Horizon year` = horizon_year,
