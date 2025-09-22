@@ -18,27 +18,6 @@ resource_files:
 ---
 
 ```{r}
-#| label: check-env-vars
-#| results: "asis"
-
-required_env_vars <- c(
-  "AZ_APP_ID",
-  "AZ_APP_SECRET",
-  "AZ_STORAGE_EP",
-  "AZ_STORAGE_CONTAINER_RESULTS",
-  "AZ_STORAGE_CONTAINER_SUPPORT",
-  "AZ_TENANT_ID",
-  "NHP_ENCRYPT_KEY"
-)
-
-if (any(Sys.getenv(required_env_vars) == "")) {
-  cat("One of the following environment variables was not set, so exiting \n\n")
-  cat(paste("*", required_env_vars, collapse = "\n"), "\n\n")
-  knitr::knit_exit() 
-}
-```
-
-```{r}
 #| label: attach-functions
 #| include: FALSE
 
@@ -51,19 +30,19 @@ purrr::walk(
 ```{r}
 #| label: read-support-data
 
-container_support <- 
+container_support <-
   get_container(container_name = Sys.getenv("AZ_STORAGE_CONTAINER_SUPPORT"))
 
 mitigator_lookup <- AzureStor::storage_read_csv(
   container_support,
   "mitigator-lookup.csv"
-) |> 
+) |>
   dplyr::filter(is.na(active_to))  # non-NA active_to means it's deprecated
 
 scheme_lookup <- AzureStor::storage_read_csv(
   container_support,
   "nhp-scheme-lookup.csv"
-) |> 
+) |>
   dplyr::mutate(
     scheme_code = `Trust ODS Code`,
     scheme_name = paste0(`Name of Hospital site`, " (", scheme_code, ")"),
@@ -103,7 +82,7 @@ mitigator_values_df <- extract_params(
   final_runs,
   mitigator_lookup,
   scheme_lookup
-) |> 
+) |>
   dplyr::filter(!is.na(`Mitigator code`))  # discard mitigators not in lookup
 ```
 
@@ -202,16 +181,16 @@ mitigators_table |>
     options = list(
       dom = 'Bftp',
       pageLength = 5,
-      buttons = list( 
+      buttons = list(
         list(
-          extend = "csv",   
+          extend = "csv",
           filename = paste0(Sys.Date(), "_mitigator-reasons-and-selections"),
           text = "Download CSV"
         )
       ),
       columnDefs = list(
         list(
-          visible = FALSE, 
+          visible = FALSE,
           targets = 7:12
         )
       )
