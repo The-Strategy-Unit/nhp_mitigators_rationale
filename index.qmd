@@ -1,5 +1,5 @@
 ---
-title: "NHP mitigator selections and rationale"
+title: "NHP: rationale for TPMA selections"
 date: "last-modified"
 date-format: D MMM YYYY HH:mm
 author: "[Data Science, The Strategy Unit](mailto:mlcsu.su.datascience@nhs.net)"
@@ -166,8 +166,10 @@ mitigators_table <- mitigators_by_scheme |>
   )
 ```
 
-This table shows the mitigators selected by each of the schemes that have run a 'final' scenario, along with their rationale for selecting the values they chose. The value for the mitigator is summarised here as the midpoint (i.e. the difference between the low and high values). For context, the mean midpoint across all schemes with a final scenario is also shown.
+This table shows the types of potentially-mitigatable activity (TPMAs) selected by each of the New Hospital Programme (NHP) schemes and their rationale for doing so, if available.
+The only scenarios shown are those that are labelled internally with a run stage of 'final_report_ndg2', i.e. the primary used in an outputs report.
 
+The value for each  TPMA is summarised here as the midpoint (i.e. the difference between the low and high values). For context, the mean midpoint across all schemes with a final scenario is also shown.
 The downloadable CSV also contains columns for the low, high and range values selected by the scheme and the mean of these values across all schemes that have run a final scenario.
 
 Please [message the Data Science team inbox](mailto:mlcsu.su.datascience@nhs.net) with questions or requests.
@@ -184,7 +186,7 @@ mitigators_table |>
       buttons = list(
         list(
           extend = "csv",
-          filename = paste0(Sys.Date(), "_mitigator-reasons-and-selections"),
+          filename = paste0(Sys.Date(), "_tpma-rationale"),
           text = "Download CSV"
         )
       ),
