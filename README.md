@@ -1,11 +1,13 @@
 
-# nhp_mitigators_rationale
+# nhp_tpma_rationale
 
 <!-- badges: start -->
 <!-- badges: end -->
 
-A simple interactive table in a Quarto doc to explore mitigator selections and associated rationale for 'final' NHP scenarios.
-[Deployed to Posit Connect](https://connect.strategyunitwm.nhs.uk/nhp/mitigators-rationale/) and re-rendered on schedule (login/permissions required).
+A simple interactive table in a Quarto doc to explore New Hospital Programme (NHP) schemes' rationale for their choice of types of potentially-mitigatable activity (TPMAs) and prediction intervals.
+Shows only scenarios tagged with a run stage of 'final_report_ndg2', i.e. the primary scenario used in output reports.
+
+[Deployed to Posit Connect](https://connect.strategyunitwm.nhs.uk/nhp/tpma-rationale/) and re-rendered on schedule (login/permissions required).
 
 ## Render locally
 
