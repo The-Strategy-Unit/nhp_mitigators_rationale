@@ -1,11 +1,10 @@
-# Extract mitigator values
+# Extract TPMA values
 extract_params <- function(
-    params,
-    runs_meta,
-    mitigator_lookup,
-    scheme_lookup
+  params,
+  runs_meta,
+  tpma_lookup,
+  scheme_lookup
 ) {
-
   possibly_report_params_table <- purrr::possibly(report_params_table)
 
   activity_avoidance <- params |>
@@ -24,14 +23,16 @@ extract_params <- function(
     dplyr::mutate(
       peer_year = paste0(
         peer,
-        "_", stringr::str_sub(baseline_year, 3, 4),
-        "_", stringr::str_sub(horizon_year, 3, 4)
+        "_",
+        stringr::str_sub(baseline_year, 3, 4),
+        "_",
+        stringr::str_sub(horizon_year, 3, 4)
       )
     ) |>
     dplyr::left_join(runs_meta, by = dplyr::join_by("peer" == "dataset")) |>
     dplyr::left_join(
-      mitigator_lookup,
-      by = dplyr::join_by(strategy == mitigator_variable)
+      tpma_lookup,
+      by = dplyr::join_by(strategy == tpma_variable)
     ) |>
     dplyr::left_join(
       scheme_lookup,
@@ -42,9 +43,9 @@ extract_params <- function(
       Range = value_2 - value_1
     ) |>
     dplyr::select(
-      `Mitigator code` = mitigator_code,
-      `Mitigator name` = mitigator_name,
-      `Mitigator type` = mitigator_type,
+      `TPMA code` = tpma_code,
+      `TPMA name` = tpma_name,
+      `TPMA type` = tpma_type,
       `Activity type` = activity_type,
       `Scheme` = scheme_name,
       `Baseline year` = baseline_year,
@@ -54,16 +55,14 @@ extract_params <- function(
       Midpoint,
       Range
     ) |>
-    dplyr::arrange(`Mitigator code`, Scheme)
-
+    dplyr::arrange(`TPMA code`, Scheme)
 }
 
 # Generate table of results
 report_params_table <- function(
-    p,  # a single scheme's params
-    parameter = c("activity_avoidance", "efficiencies")
+  p, # a single scheme's params
+  parameter = c("activity_avoidance", "efficiencies")
 ) {
-
   parameter_data <- p[[parameter]]
 
   time_profiles <- p[["time_profile_mappings"]][[parameter]] |>
@@ -88,5 +87,4 @@ report_params_table <- function(
       baseline_year = p[["start_year"]],
       horizon_year = p[["end_year"]]
     )
-
 }
