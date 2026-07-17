@@ -11,10 +11,10 @@ execute:
   echo: false
   warning: false
 resource_files:
-- R/azure.R
+- R/fetch.R
 - R/params.R
 - R/reasons.R
-- R/utils.R
+- reference/nhp-scheme-lookup.R
 ---
 
 ```{r}
@@ -22,68 +22,49 @@ resource_files:
 #| include: FALSE
 
 purrr::walk(
-  file.path("R", c("azure.R", "params.R", "reasons.R", "utils.R")),
+  file.path("R", c("fetch.R", "params.R", "reasons.R")),
   source
 )
 ```
 
 ```{r}
-#| label: read-support-data
+#| label: read-reference-data
 
-container_support <-
-  get_container(container_name = Sys.getenv("AZ_STORAGE_CONTAINER_SUPPORT"))
+tpma_lookup <- fetch_tpma_lookup()
 
-mitigator_lookup <- AzureStor::storage_read_csv(
-  container_support,
-  "mitigator-lookup.csv"
-) |>
-  dplyr::filter(is.na(active_to))  # non-NA active_to means it's deprecated
-
-scheme_lookup <- AzureStor::storage_read_csv(
-  container_support,
-  "nhp-scheme-lookup.csv"
-) |>
-  dplyr::mutate(
-    scheme_code = `Trust ODS Code`,
-    scheme_name = paste0(`Name of Hospital site`, " (", scheme_code, ")"),
-    .keep = "none"
-  )
+scheme_lookup <- readr::read_csv(
+  "reference/nhp-scheme-lookup.csv",
+  col_types = "c"
+)
 ```
 
 ```{r}
-#| label: get-final-runs
+#| label: get-tagged-runs
 
-container_results <- get_container()
-result_sets <- get_nhp_result_sets(container_results)
-
-final_runs <- result_sets |>
-  dplyr::filter(run_stage == "final_report_ndg2") |>  # focus on final reports
-  dplyr::select(dataset, scenario, run_stage, file)
-
-final_runs_data <- final_runs[["file"]] |>
-  purrr::map(\(x) get_nhp_results(container_results, x)) |>
-  purrr::set_names(final_runs[["dataset"]])
+board <- pins::board_connect()
+tagged_runs_meta <- board |> fetch_tagged_runs_meta()
+tagged_runs_params <- board |> fetch_tagged_runs_params(runs_meta = tagged_runs_meta)
 ```
 
 ```{r}
 #| label: extract-values
 
-all_params <- final_runs_data |> purrr::map(\(x) purrr::pluck(x, "params"))
-all_reasons <- all_params |> purrr::map(\(x) purrr::pluck(x, "reasons"))
+tagged_runs_reasons <- tagged_runs_params |>
+  purrr::map(\(x) purrr::pluck(x, "reasons"))
 
-mitigator_reasons_df <- purrr::map(
-  c("activity_avoidance", "efficiencies"),  # separate list elements, need both
-  \(x) extract_reasons(all_reasons, x, mitigator_lookup, scheme_lookup)
+tpma_reasons_df <- purrr::map(
+  c("activity_avoidance", "efficiencies"), # separate list elements, need both
+  \(x) extract_reasons(tagged_runs_reasons, x, tpma_lookup, scheme_lookup)
 ) |>
   purrr::list_rbind()
 
-mitigator_values_df <- extract_params(
-  all_params,
-  final_runs,
-  mitigator_lookup,
+tpma_values_df <- extract_params(
+  tagged_runs_params,
+  tagged_runs_meta,
+  tpma_lookup,
   scheme_lookup
 ) |>
-  dplyr::filter(!is.na(`Mitigator code`))  # discard mitigators not in lookup
+  dplyr::filter(!is.na(`TPMA code`)) # discard mitigators not in lookup
 ```
 
 ```{r}
@@ -91,13 +72,13 @@ mitigator_values_df <- extract_params(
 
 # Final output tables
 
-mitigators_by_scheme <- dplyr::left_join(
-  mitigator_values_df,
-  mitigator_reasons_df,
+tpmas_by_scheme <- dplyr::left_join(
+  tpma_values_df,
+  tpma_reasons_df,
   by = dplyr::join_by(
-    `Mitigator code`,
-    `Mitigator name`,
-    `Mitigator type`,
+    `TPMA code`,
+    `TPMA name`,
+    `TPMA type`,
     `Activity type`,
     Scheme
   )
@@ -109,16 +90,16 @@ mitigators_by_scheme <- dplyr::left_join(
     "Range (scheme)" = Range
   )
 
-mitigator_values_summarised <- mitigator_values_df |>
+tpma_values_summarised <- tpma_values_df |>
   dplyr::summarise(
     dplyr::across(
       c(Low, High, Midpoint, Range),
       mean
     ),
     .by = c(
-      `Mitigator code`,
-      `Mitigator name`,
-      `Mitigator type`,
+      `TPMA code`,
+      `TPMA name`,
+      `TPMA type`,
       `Activity type`
     )
   ) |>
@@ -133,29 +114,29 @@ mitigator_values_summarised <- mitigator_values_df |>
 ```{r}
 #| label: combine-tables
 
-mitigators_table <- mitigators_by_scheme |>
+tpmas_table <- tpmas_by_scheme |>
   dplyr::left_join(
-    mitigator_values_summarised,
+    tpma_values_summarised,
     by = dplyr::join_by(
-      `Mitigator code`,
-      `Mitigator name`,
-      `Mitigator type`,
+      `TPMA code`,
+      `TPMA name`,
+      `TPMA type`,
       `Activity type`
     )
   ) |>
   dplyr::mutate(
-    `Mitigator name` = paste0(`Mitigator code`, ": ", `Mitigator name`),
+    `TPMA name` = paste0(`TPMA code`, ": ", `TPMA name`),
     `Years in horizon` = `Horizon year` - `Baseline year`,
     dplyr::across(dplyr::where(is.double), \(x) janitor::round_half_up(x, 3)),
     dplyr::across(
-      c(`Activity type`, `Mitigator type`, `Mitigator name`, Scheme),
+      c(`Activity type`, `TPMA type`, `TPMA name`, Scheme),
       factor  # allows for discrete filtering in DT::datatable()
     )
   ) |>
   dplyr::select(
     `Activity type`,
-    `Mitigator type`,
-    `Mitigator name`,
+    `TPMA type`,
+    `TPMA name`,
     Scheme,
     `Years in horizon`,
     tidyselect::starts_with("Midpoint"),
@@ -167,21 +148,21 @@ mitigators_table <- mitigators_by_scheme |>
 ```
 
 This table shows the types of potentially-mitigatable activity (TPMAs) selected by each of the New Hospital Programme (NHP) schemes and their rationale for doing so, if available.
-The only scenarios shown are those that are labelled internally with a run stage of 'final_report_ndg2', i.e. the primary used in an outputs report.
+The only scenarios shown are those that are labelled internally with a run stage of 'validation_report_ndg2', otherwise 'final_report_ndg2', i.e. the primary used in an outputs report.
 
 The value for each  TPMA is summarised here as the midpoint (i.e. the difference between the low and high values). For context, the mean midpoint across all schemes with a final scenario is also shown.
-The downloadable CSV also contains columns for the low, high and range values selected by the scheme and the mean of these values across all schemes that have run a final scenario.
+The downloadable CSV also contains columns for the low, high and range values selected by the scheme and the mean of these values across all schemes that have run a 'validation' or 'final' scenario.
 
 Please [message the Data Science team inbox](mailto:mlcsu.su.datascience@nhs.net) with questions or requests.
 
 ```{r}
 #| label: interactive-table
 
-mitigators_table |>
+tpmas_table |>
   DT::datatable(
     extensions = 'Buttons',
     options = list(
-      dom = 'Bftp',
+      dom = "Bftp",
       pageLength = 5,
       buttons = list(
         list(
