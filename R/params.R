@@ -15,7 +15,8 @@ extract_params <- function(
     purrr::map(possibly_report_params_table, "efficiencies") |>
     purrr::list_rbind()
 
-  runs_meta <- runs_meta |> dplyr::select(dataset, scenario, run_stage)
+  runs_meta <- runs_meta |>
+    dplyr::select(dataset, scenario, create_datetime, run_stage)
 
   activity_avoidance |>
     dplyr::bind_rows(efficiencies) |>
@@ -48,6 +49,9 @@ extract_params <- function(
       `TPMA type` = tpma_type,
       `Activity type` = activity_type,
       `Scheme` = scheme_name,
+      Scenario = scenario,
+      Creation = create_datetime,
+      `Run stage` = run_stage,
       `Baseline year` = baseline_year,
       `Horizon year` = horizon_year,
       Low = value_1,

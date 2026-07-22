@@ -129,7 +129,7 @@ tpmas_table <- tpmas_by_scheme |>
     `Years in horizon` = `Horizon year` - `Baseline year`,
     dplyr::across(dplyr::where(is.double), \(x) janitor::round_half_up(x, 3)),
     dplyr::across(
-      c(`Activity type`, `TPMA type`, `TPMA name`, Scheme),
+      c(`Activity type`, `TPMA type`, Scheme),
       factor  # allows for discrete filtering in DT::datatable()
     )
   ) |>
@@ -138,6 +138,9 @@ tpmas_table <- tpmas_by_scheme |>
     `TPMA type`,
     `TPMA name`,
     Scheme,
+    Scenario,
+    Creation,
+    `Run stage`,
     `Years in horizon`,
     tidyselect::starts_with("Midpoint"),
     tidyselect::starts_with("Range"),
@@ -148,10 +151,10 @@ tpmas_table <- tpmas_by_scheme |>
 ```
 
 This table shows the types of potentially-mitigatable activity (TPMAs) selected by each of the New Hospital Programme (NHP) schemes and their rationale for doing so, if available.
-The only scenarios shown are those that are labelled internally with a run stage of 'validation_report_ndg2', otherwise 'final_report_ndg2', i.e. the primary used in an outputs report.
+The only scenarios shown are those that are labelled internally with a run stage of 'validation_report_ndg2', otherwise 'final_report_ndg2', i.e. the primary scenarios used in outputs reports.
 
-The value for each  TPMA is summarised here as the midpoint (i.e. the difference between the low and high values). For context, the mean midpoint across all schemes with a final scenario is also shown.
-The downloadable CSV also contains columns for the low, high and range values selected by the scheme and the mean of these values across all schemes that have run a 'validation' or 'final' scenario.
+Each scheme's 80% mitigation prediction interval is shown their low and high values, along with the mean of these values across all scenarios represented in the table.
+The downloadable CSV also contains additional columns for the midpoint and range, as well as further information like the scenario name.
 
 Please [message the Data Science team inbox](mailto:mlcsu.su.datascience@nhs.net) with questions or requests.
 
@@ -174,7 +177,7 @@ tpmas_table |>
       columnDefs = list(
         list(
           visible = FALSE,
-          targets = 7:12
+          targets = c(0:1, 4:5, 8:11) # hide in DT, show in downloadable CSV
         )
       )
     ),
